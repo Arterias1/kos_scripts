@@ -4,9 +4,9 @@
 
 // PARAMETRES DE VOL :
 
-set fuelStockDesired to 25.                     // Quantité de fuel restante pour le landing burn, minimum 15, en %.
-set apoapsisDesired to 85000.                   // Apoapsis de l'orbite souhaitée.
-set cap to 0.                                  // Cap de mise en orbite.
+set fuelStockDesired to 20.                     // Quantité de fuel restante pour le landing burn, minimum 15, en %.
+set apoapsisDesired to 135000.                   // Apoapsis de l'orbite souhaitée.
+set cap to 90.                                  // Cap de mise en orbite.
 
 
 // Variables et fonctions
@@ -19,7 +19,9 @@ lock f9_fuel to f9tank:resources[0].
 lock f9capacity to f9_fuel:capacity.
 lock f9amount to f9_fuel:amount.
 set mecoprogress to 1.
-//lock mecoProgress to round(((-(f9amount-((fuelstockdesired*0.01)*f9capacity))/((1-(fuelstockdesired*0.01))*f9capacity))*100+100)).
+set burnduration to 0.
+set circ_node to 0.
+
 
 
 // Paramètres kOs
@@ -91,7 +93,7 @@ function distances {
 function affichage_data {
   parameter flightstatus is flightstatus. // pour devenir un paramètre facultatif quand affichagedata().
   clearscreen.
-  print "F9 SECOND STAGE 2  " + char(9632) + "  " + flightstatus.
+  print "F9 SECOND STAGE  " + char(9632) + "  " + flightstatus.
   print "¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯". // 50 char, window size
   print " ".
   print "ALTITUDE : " + round(alt:radar) + " m.".
@@ -99,10 +101,17 @@ function affichage_data {
   //print "FUEL CAPACITY : " + f9_fuel:f9capacity.
   //print "FUEL AMOUNT : " + f9_fuel:f9amount.
   if mecoProgress < 100 {
-      set mecoprogress to round(((-(f9amount-((fuelstockdesired*0.01)*f9capacity))/((1-(fuelstockdesired*0.01))*f9capacity))*100+100)).  
-	    print "BURN COMPLETE : " + mecoProgress + " %".
+    set mecoprogress to round(((-(f9amount-((fuelstockdesired*0.01)*f9capacity))/((1-(fuelstockdesired*0.01))*f9capacity))*100+100)).  
+	  print " ".
+    print "BURN COMPLETE : " + mecoProgress + " %".}
+  if hasnode {
+    print " ".
+    print "BURN DURATION : " + round(burnduration) + " s.".
+    if round(circ_node:eta-(burnduration/2)) > 0 {
+      print "TIME TO BURN : " + round(circ_node:eta-(burnduration/2)) + " s.".}
   }
-  wait 0.1.
+
+  wait 0.2.
 }
 
 function launch {
@@ -122,7 +131,7 @@ function launch {
     //  set throttletime to time:seconds
     //} 
     pause(0.3).
-    set throttle to 1.
+    set SHIP:CONTROL:PILOTMAINTHROTTLE to 1.
     when alt:radar > 80 then {gear off.}
     set targetDirection to cap.
     // lock targetPitch to 90 - 1.03287 * alt:radar^0.412387.
@@ -132,7 +141,7 @@ function launch {
       set flightstatus to "GRAVITY TURN".
 	    lock steering to heading(targetDirection, targetPitch).
     }
-    when mecoprogress = 90 then {set flightstatus to "PREPARE FOR MECO".}
+    when mecoprogress = 95 then {set flightstatus to "PREPARE FOR MECO".}
 }
 
 function decoupleurf9 {
@@ -151,28 +160,29 @@ function sendFlightStatus{
 function meco {
   set flightstatus to "MECO".
   affichage_data.
-  set throttle to 0.
+  set SHIP:CONTROL:PILOTMAINTHROTTLE to 0.
   pause(2).
   decoupleurf9().
+  SET flightstatus to "STAGE SEPARATION".
   pause(1).
+  SET flightstatus to "STAGE SEPARATION : CONFIRMED".
   brakes off.
   rcs on.
   sas on.
   set sasMode to "PROGRADE".
   pause(0.5).
   marlin:shutdown().
-  set throttle to 1.
+  set SHIP:CONTROL:PILOTMAINTHROTTLE to 1.//pour le rcs activation
   set start_time to time:seconds.
   pause(3).                               // fonction en test, si false : wait 3.
-  set throttle to 0.
-  set flightstatus to "STAGE SEPARATION CONFIRMED".
+  set SHIP:CONTROL:PILOTMAINTHROTTLE to 0.
   affichage_data().
   pause(1).
   marlin:activate().
   sendflightstatus().
   rcs off.
   sas off.
-  set throttle to 1.
+  set SHIP:CONTROL:PILOTMAINTHROTTLE to 1.
   pause(2).
   set flightstatus to "SECOND STAGE BURN".
   affichage_data().
@@ -201,29 +211,45 @@ function solarPanel {
     pause(2).
     set flightstatus to "SOLAR PANEL DEPLOY : OK ".
     affichage_data.
+    pause(2).
 }
 
 function seco {
-    set throttle to 0.
+    set SHIP:CONTROL:PILOTMAINTHROTTLE to 0.
     set flightstatus to "SECOND ENGINE CUTOFF".
 }
 
+function node_circ {
+    set targetV to sqrt(ship:body:mu/(ship:orbit:body:radius + ship:orbit:apoapsis)).
+    set m to ship:orbit:body:mu.
+    set b to ship:orbit:SEMIMAJORAXIS.
+    set con1 to 1 - ship:orbit:ECCENTRICITY.
+    set con2 to 1 + ship:orbit:ECCENTRICITY.
+    set div1 to con1 * m.
+    set div2 to con2 * b.
+    set div to div1 / div2.
+    set speedAtAp to sqrt(div).
+    set dv to targetV - speedAtAp.
+    set circ_node to node(time:seconds + eta:apoapsis, 0, 0, dv).
+    add circ_node.
+    lock burnduration to circ_node:deltav:mag / (ship:maxthrust/ship:mass).
+
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////  PROGRAM STARTING  //////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////  PROGRAM  ///////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// SETTINGS + DISPLAY TELEMETRY
+distances().
+affichage_data().
 
 
 // WAITING FOR KSC MISSION CONTROL GREEN LIGHT !
 UNTIL AG5 {
   affichage_data("PRESS [5] TO START IGNITION").
 }
-
-// SETTINGS + DISPLAY TELEMETRY
-distances().
-affichage_data().
 
 // START SEQUENCE
 launch().
@@ -232,18 +258,58 @@ launch().
 when (f9amount < (fuelstockdesired*0.01) * f9capacity) then { meco(). }
 
 // FAIRING DEPLOY
-when (alt:radar > 55000) then { fairingdeploy(). }
+when (alt:radar > 60000) then { fairingdeploy(). }
 
-// SOLAR PANELS DEPLOY
-when (alt:radar > 62000) then { solarPanel().}
+// SOLAR PANELS DEPLOY 
+// when (alt:radar > 62000) then { solarPanel().}
 
 // WAITING SECO
-when (alt:radar > 65000) then { set flightstatus to "WAITING FOR SECOND BURN".}
+//when (alt:radar > 65000) then { set flightstatus to "WAITING FOR SECOND BURN".}
 
-// SECO
-when alt:apoapsis > apoapsisDesired then { seco(). }
+// SECO and SECOND BURN
+when alt:apoapsis > apoapsisDesired then { 
+  seco().
+  pause(1).
+  node_circ().
+  affichage_data("WAITING FOR SECOND BURN").
 
-until alt:radar > 80000 {
+  rcs on.
+  lock steering to circ_node:deltav.
+
+  when circ_node:eta < burnduration/2 then {
+    set flightstatus to "SECOND BURN : CIRCULARIZE".
+    set SHIP:CONTROL:PILOTMAINTHROTTLE to 1.
+    set node_burn_timedeparture to time:seconds.
+    when circ_node:deltav:mag < 100 then {
+      set ship:control:pilotmainthrottle to 0.5.
+    }
+    when circ_node:deltav:mag < 30 then {
+      set ship:control:pilotmainthrottle to 0.2.
+    }
+  }
+  // FIN DE CIRCULARISATION
+  when circ_node:deltav:mag < 1 then {
+      set ship:control:pilotmainthrottle to 0.
+      unlock steering.
+      remove circ_node.
+      set flightstatus to "EN ORBITE !".
+  }
+}
+
+// SOLAR PANELS DEPLOY
+when flightstatus = ("EN ORBITE !") then {
+  pause (2).
+  solarPanel().
+  SET flightstatus TO "EN ORBITE !".
+}
+
+
+until AG6 {
   affichage_data().
-   }
+}
+
+SET SHIP:CONTROL:NEUTRALIZE TO TRUE.
+clearscreen.
+print "END OF PROGRAM".
+print "CONTROLS RELEASED".
 
