@@ -20,10 +20,6 @@ lock decouplerstatus to ship:partsdubbedpattern("Interstage")[0]:getmodulebyinde
 
 
 
-// hudtext("Script ready, waiting for Action Group 5 trigger!", 5, 2, 50, white, false).
-// WAIT UNTIL AG5.
-
-
 
 function distances {
   // 30 km for in-flight
@@ -144,7 +140,9 @@ function landed {
 	sas off.
 }
 
-// PROGRAM.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////  PROGRAM   //////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 data().
@@ -175,7 +173,7 @@ when ship:verticalspeed > -0.01 and trueradar < 100 then {landed.}
 until flightstatus = "LANDED" {data.}
 
 // Fin du programme :
-unlock throttle.
+SET SHIP:CONTROL:NEUTRALIZE TO TRUE.
 clearscreen.
 print "F9 BOOSTER  " + char(9632) + "  " + flightstatus.
 print "¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯".
