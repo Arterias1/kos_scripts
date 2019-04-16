@@ -4,9 +4,9 @@
 
 // PARAMETRES DE VOL :
 
-set fuelStockDesired to 20.                     // Quantité de fuel restante pour le landing burn, minimum 15, en %.
+set fuelStockDesired to 20.                      // Quantité de fuel restante pour le landing burn, minimum 15, en %.
 set apoapsisDesired to 135000.                   // Apoapsis de l'orbite souhaitée.
-set cap to 90.                                  // Cap de mise en orbite.
+set cap to 90.                                   // Cap de mise en orbite.
 
 
 // Variables et fonctions
@@ -260,11 +260,6 @@ when (f9amount < (fuelstockdesired*0.01) * f9capacity) then { meco(). }
 // FAIRING DEPLOY
 when (alt:radar > 60000) then { fairingdeploy(). }
 
-// SOLAR PANELS DEPLOY 
-// when (alt:radar > 62000) then { solarPanel().}
-
-// WAITING SECO
-//when (alt:radar > 65000) then { set flightstatus to "WAITING FOR SECOND BURN".}
 
 // SECO and SECOND BURN
 when alt:apoapsis > apoapsisDesired then { 
@@ -304,10 +299,12 @@ when flightstatus = ("EN ORBITE !") then {
 }
 
 
+
+
+// END OF PROGRAM
 until AG6 {
   affichage_data().
 }
-
 SET SHIP:CONTROL:NEUTRALIZE TO TRUE.
 clearscreen.
 print "END OF PROGRAM".
